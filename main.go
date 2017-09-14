@@ -47,10 +47,8 @@ func getSession() *mgo.Session {
 	return mgoSession.Clone()
 }
 
-// md5
+// md5 as key
 var gFlagMD5 string
-
-// pwd
 
 func modifyOffset(src []byte) {
 	for idx := *offset - 1; idx != -1; idx-- {
@@ -110,7 +108,7 @@ func main() {
 	src, _ := ioutil.ReadAll(os.Stdin)
 	modifyOffset(src)
 	genFlagMD5()
-	md55(gFlagMD5, src)
+	gFlagMD5 = md55(gFlagMD5, src)
 	var result godefcache
 	if err := getSession().DB(dataBase).C(collection).Find(bson.M{"_id": gFlagMD5}).One(&result); err != nil {
 		var cmdstr string
