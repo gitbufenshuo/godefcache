@@ -17,6 +17,9 @@
     - [tested in vscode] runs well
 
     - [CAUTION] remember (the previous replace steps) when hack this code. And remember the mongodb。
+
+    - *****[for lazyguy install] ./lazyguy_install.sh
+
 ----
 ----
 ----
@@ -41,3 +44,5 @@
     - [在 vscode 中测试过] 跑起来很好
 
     - [注意] 修改 godefcache 代码之后，记得上面的替换步骤，还有 mongodb 记得开。
+
+    - *****[无痛安装] ./lazyguy_install.sh
