@@ -9,6 +9,9 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
+	"strings"
+	"sync"
 
 	"gopkg.in/mgo.v2/bson"
 
@@ -27,6 +30,7 @@ var fflag = flag.String("f", "", "Go source filename")
 var acmeFlag = flag.Bool("acme", false, "use current acme window")
 var jsonFlag = flag.Bool("json", false, "output location in JSON format (-t flag is ignored)")
 var renamegodef = flag.String("s", "godef", "in case you want to rename you godef,,,en or use the other tool instead of godef")
+var prefire = flag.Bool("p", false, "in case you want to store all symbols of a specified package")
 
 //mongo
 var (
@@ -88,6 +92,38 @@ type godefname struct {
 	Name string
 }
 
+func fprefire() {
+	if *prefire {
+		srcbuf := bytes.NewBuffer([]byte{})
+		abspath := ""
+		if !strings.HasSuffix(*fflag, "/") { // relative path
+			abspath = path.Join(os.Getenv("PWD"), *fflag)
+		}
+		fmt.Printf(">>>>>> firing [%v]\n", abspath)
+		if srcfile, err := os.Open(abspath); err != nil {
+			fail("%v", err.Error())
+		} else {
+			srccode, _ := ioutil.ReadAll(srcfile)
+			srcbuf.Write(srccode)
+			var wg sync.WaitGroup
+			for jdx := 0; jdx != srcbuf.Len()/5+1; jdx++ {
+				for idx := jdx; idx < srcbuf.Len(); idx += (srcbuf.Len()/5 + 1) {
+					wg.Add(1)
+					go func(jdx, idx int) {
+						defer wg.Done()
+						defer fmt.Printf(">>>>>> [%v]--[%v]:[%v]|[%v]\n", jdx, abspath, srcbuf.Len(), idx)
+						godefcmd := exec.Command("godef", "-i", "-t", "-o", fmt.Sprintf("%v", idx), "-f", fmt.Sprintf("%v", abspath))
+						godefcmd.Run()
+					}(jdx, idx)
+				}
+				wg.Wait()
+				fmt.Println("...---...", jdx, srcbuf.Len()/5+1)
+			}
+		}
+		success(abspath + "[ok]")
+	}
+
+}
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: godefcache [flags] [expr]\n")
@@ -98,14 +134,17 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
+	fprefire()
 	if *renamegodef != "godef" {
 		getSession().DB(dataBase).C(collection).Upsert(bson.M{"_id": "toolname"}, bson.M{"$set": bson.M{"name": *renamegodef}})
 		success(*renamegodef)
 	}
+	var src []byte
 	if !(*readStdin) {
 		fail("%v", "Only support stdin now....")
+	} else {
+		src, _ = ioutil.ReadFile(*fflag)
 	}
-	src, _ := ioutil.ReadAll(os.Stdin)
 	modifyOffset(src)
 	genFlagMD5()
 	gFlagMD5 = md55(gFlagMD5, src)

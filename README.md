@@ -20,6 +20,8 @@
 
     - *****[for lazyguy install] ./lazyguy_install.sh
 
+    - XXXXX[pre-fire] ./lazyguy_install.sh; godef -f xxx.go -p; // then all the symbols in xxx.go will be cached in mongodb, but this is slow....so you can put it in a background shell script and absolute filepath is recommended.
+
 ----
 ----
 ----
@@ -46,3 +48,5 @@
     - [注意] 修改 godefcache 代码之后，记得上面的替换步骤，还有 mongodb 记得开。
 
     - *****[无痛安装] ./lazyguy_install.sh
+
+    - XXXXX[提前缓存] ./lazyguy_install.sh; godef -f xxx.go -p; //  执行完之后，xxx.go 中的符号就已经存在 mongodb 中了，不过燃烧一个文件很慢，你可以写个后台脚本，慢慢烧。推荐用绝对路径定位文件。
