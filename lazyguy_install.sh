@@ -1,6 +1,6 @@
 #!/bin/sh
-go get github.com/rogpeppe/godef
-go get github.com/gitbufenshuo/godefcache
+go get -u github.com/rogpeppe/godef
+go get -u github.com/gitbufenshuo/godefcache
 cd $GOPATH/src/github.com/rogpeppe/godef
 go install .
 cd $GOPATH/src/github.com/gitbufenshuo/godefcache
