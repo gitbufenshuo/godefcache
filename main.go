@@ -31,6 +31,7 @@ var acmeFlag = flag.Bool("acme", false, "use current acme window")
 var jsonFlag = flag.Bool("json", false, "output location in JSON format (-t flag is ignored)")
 var renamegodef = flag.String("s", "godef", "in case you want to rename you godef,,,en or use the other tool instead of godef")
 var prefire = flag.Bool("p", false, "in case you want to store all symbols of a specified package")
+var predefinedPackage = flag.String("h", "", "important to boost, when you confirm that one identifier is the name of one package")
 
 //mongo
 var (
@@ -62,6 +63,87 @@ func modifyOffset(src []byte) {
 			break
 		}
 	}
+}
+func Find() {
+
+}
+func getpackagename(src []byte) string {
+
+	pIdx := bytes.Index(src, []byte{'p', 'a', 'c', 'k', 'a', 'g', 'e'})
+	packagenamebytes := make([]byte, 0, 0)
+	for idx := pIdx + 8; src[idx] != '\r' && src[idx] != '\n'; idx++ {
+		packagenamebytes = append(packagenamebytes, src[idx])
+	}
+	return string(packagenamebytes)
+}
+func modifyMD5(src []byte) string {
+	packagename := getpackagename(src)
+	// go ahead
+	headIdx := 0
+	for idx := *offset; idx != len(src); idx++ {
+		if notLetter(src[idx]) {
+			headIdx = idx
+			break
+		}
+	}
+	// go back
+	backIdx := 0
+	for idx := *offset - 1; idx != -1; idx-- {
+		if notLetter(src[idx]) && src[idx] != '.' {
+			backIdx = idx + 1
+			break
+		}
+	}
+	if backIdx == headIdx {
+		return ""
+	}
+	qualifiedidName := string(src[backIdx:headIdx])
+
+	dotNum := strings.Count(qualifiedidName, ".")
+	if dotNum == 0 {
+		if isCapital(qualifiedidName[0]) {
+			return packagename + "." + qualifiedidName
+		}
+		if src[headIdx] == '(' {
+			// a local-package function call
+			return packagename + "." + qualifiedidName
+		}
+		// a local-variable
+		return "......"
+	}
+	if dotNum == 1 {
+		segs := strings.Split(qualifiedidName, ".")
+		if n, _ := getSession().DB(dataBase).C(collection).Find(bson.M{"_id": segs[0]}).Count(); n == 0 {
+			// not a predefined package
+			return "......"
+		}
+		return qualifiedidName
+	}
+	return "......"
+}
+
+func isCapital(c byte) bool {
+	if c >= 'a' && c <= 'z' {
+		return true
+	}
+	return false
+}
+
+// https://golang.org/ref/spec#letter
+func notLetter(c byte) bool {
+	if c == '_' {
+		return false
+	}
+	if c >= 'a' && c <= 'z' {
+		return false
+	}
+	if c >= 'A' && c <= 'Z' {
+		return false
+	}
+	if c >= '0' && c <= '9' {
+		return false
+	}
+	return true
 }
 func md55(input string, inputbytes []byte) string {
 	md5Ctx := md5.New()
@@ -139,15 +221,41 @@ func main() {
 		getSession().DB(dataBase).C(collection).Upsert(bson.M{"_id": "toolname"}, bson.M{"$set": bson.M{"name": *renamegodef}})
 		success(*renamegodef)
 	}
+	if *predefinedPackage != "" {
+		if strings.HasPrefix(*predefinedPackage, "add:") {
+			packagename := strings.TrimPrefix(*predefinedPackage, "add:")
+			getSession().DB(dataBase).C(collection).Insert(struct {
+				ID string `bson:"_id"`
+			}{packagename})
+			success(*predefinedPackage)
+		}
+		if strings.HasPrefix(*predefinedPackage, "del:") {
+			packagename := strings.TrimPrefix(*predefinedPackage, "del:")
+			getSession().DB(dataBase).C(collection).RemoveId(packagename)
+			success(*predefinedPackage)
+		}
+		fail("add:[packagename]  or  del:[packagename]")
+	}
 	var src []byte
 	if !(*readStdin) {
 		fail("%v", "Only support stdin now....")
 	} else {
 		src, _ = ioutil.ReadFile(*fflag)
 	}
+	src = append(src, ' ') // for robust
 	modifyOffset(src)
-	genFlagMD5()
-	gFlagMD5 = md55(gFlagMD5, src)
+	unique := modifyMD5(src)
+	if unique == "" {
+		success("xxx")
+	}
+	if !(unique == "......") {
+		gFlagMD5 = md55(unique, nil)
+	} else {
+		genFlagMD5()
+		gFlagMD5 = md55(gFlagMD5, src)
+	}
+	// success(unique)
+	// dealWithPredefinedpackage(src)
 	var result godefcache
 	if err := getSession().DB(dataBase).C(collection).Find(bson.M{"_id": gFlagMD5}).One(&result); err != nil {
 		var cmdstr string
